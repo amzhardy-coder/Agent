@@ -278,6 +278,85 @@ async function resolveLabelIds(email: string, names: string[]): Promise<string[]
   });
 }
 
+export interface BulkArchiveResult {
+  account: string;
+  query: string;
+  matched: number;
+  archived: number;
+  markedRead: boolean;
+  dryRun: boolean;
+  hitLimit: boolean;
+  sample: { from: string; subject: string; date: string }[];
+}
+
+/**
+ * Archive (remove INBOX from) every inbox message matching a Gmail search, using
+ * messages.batchModify (up to 1000 ids per request) instead of one call per thread.
+ * The search is always limited to the inbox. With dryRun, nothing changes and a
+ * sample of matching messages is returned for review.
+ */
+export async function bulkArchive(
+  email: string,
+  query: string,
+  opts: { markRead?: boolean; dryRun?: boolean; limit?: number } = {},
+): Promise<BulkArchiveResult> {
+  const limit = Math.min(Math.max(opts.limit ?? 2000, 1), 10000);
+  const q = /\bin:inbox\b/i.test(query) ? query : `${query} in:inbox`.trim();
+
+  const ids: string[] = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({ q, maxResults: "500" });
+    if (pageToken) params.set("pageToken", pageToken);
+    const page = await gmail<{ messages?: { id: string }[]; nextPageToken?: string }>(email, `messages?${params}`);
+    for (const m of page.messages ?? []) ids.push(m.id);
+    pageToken = page.nextPageToken;
+  } while (pageToken && ids.length < limit);
+
+  const hitLimit = ids.length >= limit && Boolean(pageToken);
+  const targets = ids.slice(0, limit);
+
+  const meta = new URLSearchParams({ format: "metadata" });
+  for (const h of ["From", "Subject", "Date"]) meta.append("metadataHeaders", h);
+  const sample = await Promise.all(
+    targets.slice(0, 10).map(async (id) => {
+      const m = await gmail<Message>(email, `messages/${id}?${meta}`);
+      return { from: header(m, "From"), subject: header(m, "Subject"), date: header(m, "Date") };
+    }),
+  );
+
+  let archived = 0;
+  if (!opts.dryRun) {
+    const removeLabelIds = opts.markRead ? ["INBOX", "UNREAD"] : ["INBOX"];
+    for (let i = 0; i < targets.length; i += 1000) {
+      const chunk = targets.slice(i, i + 1000);
+      // batchModify returns an empty body on success, so don't parse JSON.
+      const token = await accessTokenFor(email);
+      const res = await fetch(`${BASE}/messages/batchModify`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: chunk, removeLabelIds }),
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        throw new Error(`Gmail ${res.status} (${email}) after archiving ${archived} messages: ${await res.text()}`);
+      }
+      archived += chunk.length;
+    }
+  }
+
+  return {
+    account: email,
+    query: q,
+    matched: targets.length,
+    archived,
+    markedRead: Boolean(opts.markRead) && !opts.dryRun,
+    dryRun: Boolean(opts.dryRun),
+    hitLimit,
+    sample,
+  };
+}
+
 export async function modifyThread(email: string, threadId: string, add: string[] = [], remove: string[] = []) {
   const [addLabelIds, removeLabelIds] = await Promise.all([resolveLabelIds(email, add), resolveLabelIds(email, remove)]);
   await gmail(email, `threads/${threadId}/modify`, {
