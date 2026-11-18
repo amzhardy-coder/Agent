@@ -7,7 +7,7 @@ export default function Privacy() {
       <p className="muted small">Last updated: November 18, 2026</p>
 
       <p>
-        Claude Gmail Connector is a private tool operated by BridgePointe Solutions LLC for its owner's own Gmail
+        Claude Gmail Connector is a private tool operated by Andrea Hardy for her own Gmail
         accounts. It is not offered to the public.
       </p>
 
@@ -37,7 +37,7 @@ export default function Privacy() {
       </p>
 
       <h2>Contact</h2>
-      <p>andrea@bridgepointesolutions.net</p>
+      <p>Andrea Hardy — amzhardy@gmail.com</p>
     </main>
   );
 }
