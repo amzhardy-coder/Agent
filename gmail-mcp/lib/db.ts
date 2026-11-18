@@ -16,11 +16,15 @@ export interface Account {
 }
 
 async function rest(path: string, init: RequestInit = {}): Promise<Response> {
+  const key = env.supabaseServiceKey;
+  // New-style Supabase secret keys (sb_secret_...) go only in the apikey header;
+  // legacy service_role JWTs also go in Authorization.
+  const auth: Record<string, string> = key.startsWith("sb_") ? {} : { Authorization: `Bearer ${key}` };
   const res = await fetch(`${env.supabaseUrl}/rest/v1/${path}`, {
     ...init,
     headers: {
-      apikey: env.supabaseServiceKey,
-      Authorization: `Bearer ${env.supabaseServiceKey}`,
+      apikey: key,
+      ...auth,
       "Content-Type": "application/json",
       ...(init.headers ?? {}),
     },
