@@ -158,6 +158,30 @@ const mcp = createMcpHandler(
     );
 
     server.tool(
+      "bulk_archive",
+      "Archive every inbox email in ONE account that matches a Gmail search (e.g. 'category:promotions', " +
+        "'from:costco.com older_than:30d'), in a few requests instead of one call per thread. The search is always " +
+        "limited to the inbox. Nothing is deleted: archived mail stays in All Mail. Run with dry_run=true first to see " +
+        "how many emails match and a sample, then run again with dry_run=false. If hitLimit is true, run it again " +
+        "to archive the rest.",
+      {
+        account: z.string().describe("Account email or nickname (from list_accounts). Required: one account per call."),
+        query: z.string().min(1).describe("Gmail search query selecting what to archive"),
+        mark_read: z.boolean().default(false).describe("Also mark the archived emails as read"),
+        dry_run: z.boolean().default(true).describe("Preview only: count matches and show a sample without changing anything"),
+        limit: z.number().int().min(1).max(10000).default(2000).describe("Maximum emails to archive in this call"),
+      },
+      async ({ account, query, mark_read, dry_run, limit }) => {
+        try {
+          const r = await gm.bulkArchive(await resolveAccount(account), query, { markRead: mark_read, dryRun: dry_run, limit });
+          return json(r);
+        } catch (e) {
+          return fail(e);
+        }
+      },
+    );
+
+    server.tool(
       "list_labels",
       "List the labels in an account.",
       { account: accountArg },

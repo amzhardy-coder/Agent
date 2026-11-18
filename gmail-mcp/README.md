@@ -13,6 +13,7 @@ A private MCP connector that gives Claude access to **several Gmail accounts at 
 | `list_drafts` | Recent drafts |
 | `send_draft` | Sends a draft. Claude is told to call it only after you approve |
 | `update_labels` | Archive, mark read, star, or apply custom labels |
+| `bulk_archive` | Archive every inbox email in one account matching a Gmail search, in bulk. Previews by default (`dry_run`) |
 | `list_labels` | Labels in an account |
 
 Accounts can be referred to by email or nickname ("Work", "Personal").
