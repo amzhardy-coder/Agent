@@ -24,7 +24,8 @@ export const env = {
     return required("SUPABASE_URL").replace(/\/+$/, "");
   },
   get supabaseServiceKey() {
-    return required("SUPABASE_SERVICE_ROLE_KEY");
+    // Also accept the misspelled name used when the key was first added in Vercel.
+    return process.env.SUPABASE_SERVICE_ROLE_KEY || required("SUPBASE_SERVICE_ROLE_KEY");
   },
 };
 
